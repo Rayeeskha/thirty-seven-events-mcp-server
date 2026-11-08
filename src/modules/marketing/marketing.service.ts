@@ -1,6 +1,7 @@
-import { EventService } from '../events/event.service';
-import { EventDto } from '../events/event.types';
-import { ValidationError } from '../../utils/errors';
+import { EventService } from "../events/event.service";
+import { EventDto } from "../events/event.types";
+import { ERROR_MESSAGES } from "../../config/messages";
+import { ValidationError } from "../../utils/errors";
 import {
   DraftLanguage,
   MarketingChannel,
@@ -8,20 +9,23 @@ import {
   MarketingDraft,
   MarketingDraftResult,
   MarketingLanguage,
-} from './marketing.types';
-import { composeArabic } from './templates/ar';
-import { buildMarketingContext } from './templates/context';
-import { ComposedMessage, composeEnglish } from './templates/en';
+} from "./marketing.types";
+import { composeArabic } from "./templates/ar";
+import { buildMarketingContext } from "./templates/context";
+import { ComposedMessage, composeEnglish } from "./templates/en";
 
-const COMPOSERS: Record<DraftLanguage, (ctx: MarketingContext, channel: MarketingChannel) => ComposedMessage> = {
+const COMPOSERS: Record<
+  DraftLanguage,
+  (ctx: MarketingContext, channel: MarketingChannel) => ComposedMessage
+> = {
   EN: composeEnglish,
   AR: composeArabic,
 };
 
 const LANGUAGES_BY_SELECTION: Record<MarketingLanguage, DraftLanguage[]> = {
-  EN: ['EN'],
-  AR: ['AR'],
-  BOTH: ['EN', 'AR'],
+  EN: ["EN"],
+  AR: ["AR"],
+  BOTH: ["EN", "AR"],
 };
 
 export interface DraftMarketingRequest {
@@ -29,10 +33,15 @@ export interface DraftMarketingRequest {
   language: MarketingLanguage;
 }
 
-function assertPromotable(event: EventDto): asserts event is EventDto & { status: MarketingContext['status'] } {
-  if (event.status === 'CANCELLED') {
-    throw new ValidationError('Marketing content cannot be drafted for a cancelled event', [
-      { path: 'event_id', message: `Event ${event.id} is CANCELLED` },
+function assertPromotable(
+  event: EventDto,
+): asserts event is EventDto & { status: MarketingContext["status"] } {
+  if (event.status === "CANCELLED") {
+    throw new ValidationError(ERROR_MESSAGES.marketingCancelled, [
+      {
+        path: "event_id",
+        message: ERROR_MESSAGES.marketingCancelledDetail(event.id),
+      },
     ]);
   }
 }
@@ -40,14 +49,22 @@ function assertPromotable(event: EventDto): asserts event is EventDto & { status
 export class MarketingService {
   constructor(private readonly eventService: EventService) {}
 
-  async draftMessage(eventId: number, request: DraftMarketingRequest): Promise<MarketingDraftResult> {
+  async draftMessage(
+    eventId: number,
+    request: DraftMarketingRequest,
+  ): Promise<MarketingDraftResult> {
     const event = await this.eventService.getEventById(eventId);
     assertPromotable(event);
 
-    const drafts: MarketingDraft[] = LANGUAGES_BY_SELECTION[request.language].map((language) => ({
+    const drafts: MarketingDraft[] = LANGUAGES_BY_SELECTION[
+      request.language
+    ].map((language) => ({
       language,
       channel: request.channel,
-      ...COMPOSERS[language](buildMarketingContext(event, language), request.channel),
+      ...COMPOSERS[language](
+        buildMarketingContext(event, language),
+        request.channel,
+      ),
     }));
 
     return {

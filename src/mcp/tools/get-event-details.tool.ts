@@ -1,17 +1,23 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Services } from '../../container';
-import { eventIdSchema } from '../../modules/events/event.validation';
-import { runTool } from '../tool-result';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { MCP_TOOLS_CONFIG } from "../../config/mcp-tools.config";
+import { Services } from "../../container";
+import { eventIdSchema } from "../../modules/events/event.validation";
+import { runTool } from "../tool-result";
 
-export function registerGetEventDetailsTool(server: McpServer, { eventService }: Services): void {
+export function registerGetEventDetailsTool(
+  server: McpServer,
+  { eventService }: Services,
+): void {
+  const config = MCP_TOOLS_CONFIG.getEventDetails;
   server.registerTool(
-    'get_event_details',
+    config.name,
     {
-      title: 'Get event details',
-      description: 'Retrieve all stored information about one event (name, date, client, budget in SAR, status, number of projects, timestamps) by its ID.',
-      inputSchema: { event_id: eventIdSchema.describe('ID of the event') },
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: config.title,
+      description: config.description,
+      inputSchema: config.inputSchema,
+      annotations: config.annotations,
     },
-    ({ event_id }) => runTool(() => eventService.getEventById(eventIdSchema.parse(event_id))),
+    ({ event_id }) =>
+      runTool(() => eventService.getEventById(eventIdSchema.parse(event_id))),
   );
 }

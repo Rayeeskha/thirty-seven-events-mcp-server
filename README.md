@@ -14,12 +14,12 @@ There is no REST API and no web interface: the MCP endpoint is the only thing th
 
 ## How the client's requirements are met
 
-| Requirement | Where |
-|---|---|
-| An MCP server connected to an events data source | `src/mcp/` (official MCP TypeScript SDK, Streamable HTTP) over a MySQL `events` table (`src/database/`) |
-| At least four tools: search, details, create / update status, marketing messages in English and Arabic | Five tools: `search_events`, `get_event_details`, `add_event`, `update_event_status`, `draft_marketing_message` ([section 7](#7-mcp-tools)) |
-| Integration with Claude or another MCP client | Claude Desktop, Claude Code and Claude's custom connectors ([section 6](#6-connecting-claude-to-the-mcp-server)); also verified with the official MCP Inspector and the SDK client |
-| Confirmation before any event is created or changed | A two-step, token-based workflow enforced in the backend ([section 8](#8-the-confirmation-workflow)) |
+| Requirement                                                                                            | Where                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An MCP server connected to an events data source                                                       | `src/mcp/` (official MCP TypeScript SDK, Streamable HTTP) over a MySQL `events` table (`src/database/`)                                                                            |
+| At least four tools: search, details, create / update status, marketing messages in English and Arabic | Five tools: `search_events`, `get_event_details`, `add_event`, `update_event_status`, `draft_marketing_message` ([section 7](#7-mcp-tools))                                        |
+| Integration with Claude or another MCP client                                                          | Claude Desktop, Claude Code and Claude's custom connectors ([section 6](#6-connecting-claude-to-the-mcp-server)); also verified with the official MCP Inspector and the SDK client |
+| Confirmation before any event is created or changed                                                    | A two-step, token-based workflow enforced in the backend ([section 8](#8-the-confirmation-workflow))                                                                               |
 
 ## Contents
 
@@ -41,15 +41,15 @@ There is no REST API and no web interface: the MCP endpoint is the only thing th
 
 ## 1. Technology stack
 
-| Concern | Choice |
-|---|---|
-| Runtime / language | Node.js ≥ 20 (verified on 20.20 and 22.23), TypeScript 7 |
-| MCP | Official `@modelcontextprotocol/sdk` 1.x, Streamable HTTP transport (stateless) |
-| HTTP hosting | Express 5, used only to host the `/mcp` endpoint |
-| Database | MySQL 8 (≥ 8.0.16, for `CHECK` constraints) |
-| ORM / migrations | Sequelize 6 + `sequelize-cli` |
-| Validation | Zod 4 (one schema set, shared by the tool definitions and the services) |
-| Tests | Jest 30 (SWC transform), using the SDK's own MCP client |
+| Concern            | Choice                                                                          |
+| ------------------ | ------------------------------------------------------------------------------- |
+| Runtime / language | Node.js ≥ 20 (verified on 20.20 and 22.23), TypeScript 7                        |
+| MCP                | Official `@modelcontextprotocol/sdk` 1.x, Streamable HTTP transport (stateless) |
+| HTTP hosting       | Express 5, used only to host the `/mcp` endpoint                                |
+| Database           | MySQL 8 (≥ 8.0.16, for `CHECK` constraints)                                     |
+| ORM / migrations   | Sequelize 6 + `sequelize-cli`                                                   |
+| Validation         | Zod 4 (one schema set, shared by the tool definitions and the services)         |
+| Tests              | Jest 30 (SWC transform), using the SDK's own MCP client                         |
 
 Sequelize stays on 6.x because 7.x is still published only as an alpha. Runtime dependencies: the MCP SDK, Express, Sequelize, `mysql2`, Zod and `dotenv`.
 
@@ -58,7 +58,7 @@ Sequelize stays on 6.x because 7.x is still published only as an alpha. Runtime 
 ```text
 thirty-seven-events/
 ├── src/
-│   ├── config/              env.ts (validated env), database.ts, sequelize-cli.config.ts
+│   ├── config/              env.ts (validated env), database.ts, messages.ts, mcp-tools.config.ts, sequelize-cli.config.ts
 │   ├── database/
 │   │   ├── models/          event.model.ts, pending-operation.model.ts
 │   │   ├── migrations/      events table, pending_operations table
@@ -74,7 +74,7 @@ thirty-seven-events/
 │   │   ├── mcp-transport.ts the /mcp endpoint (Streamable HTTP, stateless)
 │   │   └── tool-result.ts   turns service results and errors into MCP tool results
 │   ├── middlewares/         error handler, 404 handler
-│   ├── utils/               errors, hashing, date validation, logger
+│   ├── utils/               errors, error-response.ts, hashing, date validation, logger
 │   ├── container.ts         composition root (wires everything together)
 │   ├── app.ts               Express app: the /mcp endpoint and nothing else
 │   ├── bootstrap.ts         HTTP startup and graceful shutdown
@@ -88,7 +88,7 @@ thirty-seven-events/
 └── tsconfig.json
 ```
 
-Layering: `MCP tool → service → repository → model`. Tool handlers only validate input, call a service and format the result; the business rules live once, in the services.
+Layering: `MCP tool → service → repository → model`. Tool handlers only validate input, call a service and format the result; the business rules live once, in the services. MCP server and tool metadata (names, titles, descriptions, input schemas and annotations) is centralized in `src/config/mcp-tools.config.ts`. Shared application, validation and MCP error text is defined in `src/config/messages.ts`; HTTP and MCP tool errors use one response formatter in `src/utils/error-response.ts`.
 
 ## 3. Prerequisites
 
@@ -122,23 +122,27 @@ cp .env.example .env
 # then edit .env: at minimum set DB_PASSWORD to the password you chose above
 ```
 
-> **Keep the single quotes around `DB_PASSWORD`.** In a `.env` file an unquoted `#` starts a comment, so `DB_PASSWORD=pa#ss` is silently read as `pa` and MySQL answers *Access denied*. Single quotes are read literally (`DB_PASSWORD='pa#ss'`). If the password contains a single quote, wrap it in backticks instead.
+> **Keep the single quotes around `DB_PASSWORD`.** In a `.env` file an unquoted `#` starts a comment, so `DB_PASSWORD=pa#ss` is silently read as `pa` and MySQL answers _Access denied_. Single quotes are read literally (`DB_PASSWORD='pa#ss'`). If the password contains a single quote, wrap it in backticks instead.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `NODE_ENV` | `development` | `development`, `test` or `production`. The logger is silent when `test`. |
-| `DB_HOST` | `127.0.0.1` | MySQL host. |
-| `DB_PORT` | `3306` | MySQL port. |
-| `DB_NAME` | *(required)* | Database name. |
-| `DB_USER` | *(required)* | Database user. |
-| `DB_PASSWORD` | *(required)* | Database password. Keep it in single quotes. |
-| `DB_LOGGING` | `false` | `true` prints every SQL statement. |
-| `CONFIRMATION_TTL_SECONDS` | `300` | How long a confirmation token stays valid (1–3600). |
-| `MCP_HOST` | `127.0.0.1` | Interface the server binds to. |
-| `MCP_PORT` | `3001` | Port the server listens on. |
-| `MCP_PATH` | `/mcp` | URL path of the MCP endpoint. |
-| `MCP_ALLOWED_HOSTS` | *(empty)* | Comma-separated `Host` header values accepted by the endpoint. Empty means localhost only (`localhost`, `127.0.0.1`, `[::1]`). Set it to your public host name when the server is reached through a tunnel or reverse proxy. |
-| `TEST_DB_NAME` | `thirty_seven_events_test` | Tests only; must end in `_test`. |
+| Variable                   | Default                    | Purpose                                                                                                                                                                                                                      |
+| -------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                 | `development`              | `development`, `test` or `production`. The logger is silent when `test`.                                                                                                                                                     |
+| `DB_HOST`                  | `127.0.0.1`                | MySQL host.                                                                                                                                                                                                                  |
+| `DB_PORT`                  | `3306`                     | MySQL port.                                                                                                                                                                                                                  |
+| `DB_NAME`                  | _(required)_               | Database name.                                                                                                                                                                                                               |
+| `DB_USER`                  | _(required)_               | Database user.                                                                                                                                                                                                               |
+| `DB_PASSWORD`              | _(required in production)_ | Database password. Empty is accepted only outside production for local MySQL configured without a password. Keep non-empty values in single quotes.                                                                          |
+| `DB_LOGGING`               | `false`                    | `true` prints every SQL statement.                                                                                                                                                                                           |
+| `DB_POOL_MAX`              | `5`                        | Maximum shared MySQL connections in the Sequelize pool.                                                                                                                                                                      |
+| `DB_POOL_MIN`              | `0`                        | Minimum connections kept in the pool; must not exceed `DB_POOL_MAX`.                                                                                                                                                         |
+| `DB_POOL_IDLE_MS`          | `10000`                    | Time in milliseconds before an idle connection can be released.                                                                                                                                                              |
+| `DB_POOL_ACQUIRE_MS`       | `60000`                    | Maximum time in milliseconds to wait for a pooled connection.                                                                                                                                                                |
+| `CONFIRMATION_TTL_SECONDS` | `300`                      | How long a confirmation token stays valid (1–3600).                                                                                                                                                                          |
+| `MCP_HOST`                 | `127.0.0.1`                | Interface the server binds to.                                                                                                                                                                                               |
+| `MCP_PORT`                 | `3001`                     | Port the server listens on.                                                                                                                                                                                                  |
+| `MCP_PATH`                 | `/mcp`                     | URL path of the MCP endpoint.                                                                                                                                                                                                |
+| `MCP_ALLOWED_HOSTS`        | _(empty)_                  | Comma-separated `Host` header values accepted by the endpoint. Empty means localhost only (`localhost`, `127.0.0.1`, `[::1]`). Set it to your public host name when the server is reached through a tunnel or reverse proxy. |
+| `TEST_DB_NAME`             | `thirty_seven_events_test` | Tests only; must end in `_test`.                                                                                                                                                                                             |
 
 Configuration is validated at startup: an invalid value stops the process with a message naming the variable. Each setting goes on its own `NAME=value` line; never paste a command into `.env`.
 
@@ -191,7 +195,7 @@ A line of JSON containing `"serverInfo":{"name":"thirty-seven-events"` means it 
 
 The endpoint speaks **Streamable HTTP**, stateless (no session id), with JSON responses. Pick the route that matches your Claude client. (A longer walkthrough with troubleshooting: [docs/CONNECTING_CLAUDE.md](docs/CONNECTING_CLAUDE.md).)
 
-> **Where the connection comes from matters.** Claude's *custom connectors* (claude.ai, Claude Desktop, Cowork, mobile) connect **from Anthropic's cloud**, not from your computer, so the server must be **publicly reachable**; `localhost` will not work for them. Claude Code and the local Claude Desktop config run on your machine and *can* use `localhost`. See Anthropic's page *Get started with custom connectors using remote MCP* (support.claude.com) for the current menu labels, which change between releases.
+> **Where the connection comes from matters.** Claude's _custom connectors_ (claude.ai, Claude Desktop, Cowork, mobile) connect **from Anthropic's cloud**, not from your computer, so the server must be **publicly reachable**; `localhost` will not work for them. Claude Code and the local Claude Desktop config run on your machine and _can_ use `localhost`. See Anthropic's page _Get started with custom connectors using remote MCP_ (support.claude.com) for the current menu labels, which change between releases.
 
 ### Option A — Claude Desktop with a local server (via `mcp-remote`)
 
@@ -257,12 +261,12 @@ It searches, reads details, proposes a new event, shows that a changed budget an
 
 **Live in Claude.** After connecting, try these in one conversation and check what Claude does:
 
-1. *"Which events do we have for Najd Telecom?"* — Claude should call `search_events` and list two events.
-2. *"Create an event called Saudi Tech Expo on 10 May 2027 for Kingdom Fintech Council, budget 310,500.50 SAR."* — Claude should show a summary and **ask before saving**. Check it has not been saved yet:
+1. _"Which events do we have for Najd Telecom?"_ — Claude should call `search_events` and list two events.
+2. _"Create an event called Saudi Tech Expo on 10 May 2027 for Kingdom Fintech Council, budget 310,500.50 SAR."_ — Claude should show a summary and **ask before saving**. Check it has not been saved yet:
    `mysql -u t37 -p thirty_seven_events -e "SELECT id,event_name FROM events WHERE event_name='Saudi Tech Expo'"` (expect no rows).
-3. *"Yes, go ahead."* — the event is created; repeat the query above (expect one row).
-4. *"Mark it as in progress."* — Claude should again show a summary and ask first.
-5. *"Write an Instagram post for it in English and Arabic."* — copy built only from the stored name, date, client and status.
+3. _"Yes, go ahead."_ — the event is created; repeat the query above (expect one row).
+4. _"Mark it as in progress."_ — Claude should again show a summary and ask first.
+5. _"Write an Instagram post for it in English and Arabic."_ — copy built only from the stored name, date, client and status.
 
 Claude's own tool-approval prompts may appear as well; those are separate from this server's confirmation step. If Claude saves something without asking you, that is a behaviour to report, since the server itself will refuse any write that lacks a valid, matching token.
 
@@ -284,13 +288,13 @@ Nothing is written until the second step; see the next sections.
 
 ## 7. MCP tools
 
-| Tool | Purpose | Parameters |
-|---|---|---|
-| `search_events` | Find events. Filters combine with AND. | `event_date`, `date_from`, `date_to` (`YYYY-MM-DD`); `client` (case-insensitive partial match); `status`; `limit` (1–100, default 20); `offset` |
-| `get_event_details` | All fields of one event. | `event_id` |
-| `add_event` 🔒 | Create an event. | `event_name`, `event_date`, `client`, `budget` (SAR, ≤ 2 decimals) — required; `number_of_projects` (default 0), `status` (default `PLANNED`); `confirmation_token` |
-| `update_event_status` 🔒 | Change an event's status. | `event_id`, `status`; `confirmation_token` |
-| `draft_marketing_message` | Instagram post or email copy from the event's stored data. | `event_id`, `channel` (`INSTAGRAM_POST` \| `EMAIL`), `language` (`EN` \| `AR` \| `BOTH`, default `EN`) |
+| Tool                      | Purpose                                                    | Parameters                                                                                                                                                          |
+| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search_events`           | Find events. Filters combine with AND.                     | `event_date`, `date_from`, `date_to` (`YYYY-MM-DD`); `client` (case-insensitive partial match); `status`; `limit` (1–100, default 20); `offset`                     |
+| `get_event_details`       | All fields of one event.                                   | `event_id`                                                                                                                                                          |
+| `add_event` 🔒            | Create an event.                                           | `event_name`, `event_date`, `client`, `budget` (SAR, ≤ 2 decimals) — required; `number_of_projects` (default 0), `status` (default `PLANNED`); `confirmation_token` |
+| `update_event_status` 🔒  | Change an event's status.                                  | `event_id`, `status`; `confirmation_token`                                                                                                                          |
+| `draft_marketing_message` | Instagram post or email copy from the event's stored data. | `event_id`, `channel` (`INSTAGRAM_POST` \| `EMAIL`), `language` (`EN` \| `AR` \| `BOTH`, default `EN`)                                                              |
 
 🔒 = two-step, requires confirmation (next section). Results are JSON text; failures set MCP's `isError` flag and return `{ "error": { "code", "message", "details?" } }`.
 
@@ -298,7 +302,7 @@ Nothing is written until the second step; see the next sections.
 
 ## 8. The confirmation workflow
 
-The client's rule is: *"The AI must ask for confirmation before it adds or changes any event."* This is enforced **in the backend**, not just by prompting.
+The client's rule is: _"The AI must ask for confirmation before it adds or changes any event."_ This is enforced **in the backend**, not just by prompting.
 
 ```text
 Step 1  call add_event / update_event_status WITHOUT confirmation_token
@@ -314,32 +318,32 @@ Step 2  only after the user explicitly says yes, call the SAME tool again
 
 **Guarantees**
 
-| Property | How it is enforced |
-|---|---|
-| No write before confirmation | Step 1 only stores a proposal; the write path requires a valid token. |
-| Bound to the exact operation and parameters | The token is tied to the operation type and a hash of the canonicalised parameters. Any change is rejected. A rejected attempt does not burn the token. |
-| Expires | `CONFIRMATION_TTL_SECONDS` (default 5 minutes). The exact expiry instant counts as expired. |
-| Single use, even under concurrency | Consumed by an atomic `UPDATE … WHERE consumed_at IS NULL` inside the same transaction as the write. Of 30 simultaneous confirmations exactly one succeeds. |
-| Confirmation and write succeed or fail together | One database transaction. If the write fails, the token is not consumed. |
-| Stale proposals rejected | A status change records the status it was proposed from; if the event changed since, confirmation fails and a fresh proposal is needed. |
-| Token never stored | Only its SHA-256 hash is in the database; tokens are 32 random bytes (base64url). |
+| Property                                        | How it is enforced                                                                                                                                          |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No write before confirmation                    | Step 1 only stores a proposal; the write path requires a valid token.                                                                                       |
+| Bound to the exact operation and parameters     | The token is tied to the operation type and a hash of the canonicalised parameters. Any change is rejected. A rejected attempt does not burn the token.     |
+| Expires                                         | `CONFIRMATION_TTL_SECONDS` (default 5 minutes). The exact expiry instant counts as expired.                                                                 |
+| Single use, even under concurrency              | Consumed by an atomic `UPDATE … WHERE consumed_at IS NULL` inside the same transaction as the write. Of 30 simultaneous confirmations exactly one succeeds. |
+| Confirmation and write succeed or fail together | One database transaction. If the write fails, the token is not consumed.                                                                                    |
+| Stale proposals rejected                        | A status change records the status it was proposed from; if the event changed since, confirmation fails and a fresh proposal is needed.                     |
+| Token never stored                              | Only its SHA-256 hash is in the database; tokens are 32 random bytes (base64url).                                                                           |
 
 **Error codes** (returned in the tool result as `error.code`)
 
-| Code | Meaning |
-|---|---|
-| `CONFIRMATION_TOKEN_INVALID` | Token not recognised. |
-| `CONFIRMATION_TOKEN_EXPIRED` | Token expired; request a new confirmation. |
-| `CONFIRMATION_TOKEN_ALREADY_USED` | Token already consumed (including losing a race). |
-| `CONFIRMATION_PARAMETERS_MISMATCH` | Parameters differ from the proposal, or the token is for another operation. |
-| `CONFLICT` | Status unchanged, or the event changed since the proposal. |
-| `NOT_FOUND` | Event does not exist. |
-| `VALIDATION_ERROR` | Input failed validation (details per field), or marketing was requested for a cancelled event. |
-| `INTERNAL_ERROR` | Unexpected failure; details are logged, never returned. |
+| Code                               | Meaning                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `CONFIRMATION_TOKEN_INVALID`       | Token not recognised.                                                                          |
+| `CONFIRMATION_TOKEN_EXPIRED`       | Token expired; request a new confirmation.                                                     |
+| `CONFIRMATION_TOKEN_ALREADY_USED`  | Token already consumed (including losing a race).                                              |
+| `CONFIRMATION_PARAMETERS_MISMATCH` | Parameters differ from the proposal, or the token is for another operation.                    |
+| `CONFLICT`                         | Status unchanged, or the event changed since the proposal.                                     |
+| `NOT_FOUND`                        | Event does not exist.                                                                          |
+| `VALIDATION_ERROR`                 | Input failed validation (details per field), or marketing was requested for a cancelled event. |
+| `INTERNAL_ERROR`                   | Unexpected failure; details are logged, never returned.                                        |
 
 Input that violates a tool's schema is rejected by the MCP SDK itself, before the tool runs, as an `isError` result with a plain validation message.
 
-**Honest limit.** A server cannot prove that a *human* said "yes". It guarantees that nothing is written without a valid, matching, unexpired, unused token. Whether the AI really asked the user relies on the tool descriptions, the server instructions, the returned `instructions` text, and the client's own tool-approval prompt (Claude asks before running tools). A misbehaving model could call both steps back to back; keep tool approval enabled in your Claude client.
+**Honest limit.** A server cannot prove that a _human_ said "yes". It guarantees that nothing is written without a valid, matching, unexpired, unused token. Whether the AI really asked the user relies on the tool descriptions, the server instructions, the returned `instructions` text, and the client's own tool-approval prompt (Claude asks before running tools). A misbehaving model could call both steps back to back; keep tool approval enabled in your Claude client.
 
 ## 9. Testing
 
@@ -353,15 +357,15 @@ Tests need the MySQL `_test` database from section 4.1 and the credentials in `.
 
 **What is covered** (335 tests, 15 suites):
 
-| Area | Where |
-|---|---|
-| The client's 12 required scenarios — search by date, client, status; event details; add; update status; English and Arabic marketing drafts; rejecting creation and status updates without confirmation; expired tokens; duplicate confirmation | `tests/integration/requirements.test.ts` |
-| Parameter binding, stale proposals, atomic rollback, token hashing, text-returning databases | `tests/integration/confirmation-safety.test.ts` |
-| Tool catalogue and schemas, error semantics, input safety, transport edge cases, DNS-rebinding protection, state shared across clients | `tests/integration/mcp-protocol.test.ts` |
-| Concurrent confirmations (including connection-pool exhaustion) | `tests/integration/concurrency.test.ts` |
-| The server as a real process: startup, serving, SIGTERM, failing fast | `tests/integration/entrypoints.test.ts` |
-| The atomic claim against MySQL | `tests/integration/pending-operation-repository.test.ts` |
-| Units: input schemas, confirmation service, hashing, dates, errors, marketing, env, logger, database config | `tests/unit/` |
+| Area                                                                                                                                                                                                                                            | Where                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| The client's 12 required scenarios — search by date, client, status; event details; add; update status; English and Arabic marketing drafts; rejecting creation and status updates without confirmation; expired tokens; duplicate confirmation | `tests/integration/requirements.test.ts`                 |
+| Parameter binding, stale proposals, atomic rollback, token hashing, text-returning databases                                                                                                                                                    | `tests/integration/confirmation-safety.test.ts`          |
+| Tool catalogue and schemas, error semantics, input safety, transport edge cases, DNS-rebinding protection, state shared across clients                                                                                                          | `tests/integration/mcp-protocol.test.ts`                 |
+| Concurrent confirmations (including connection-pool exhaustion)                                                                                                                                                                                 | `tests/integration/concurrency.test.ts`                  |
+| The server as a real process: startup, serving, SIGTERM, failing fast                                                                                                                                                                           | `tests/integration/entrypoints.test.ts`                  |
+| The atomic claim against MySQL                                                                                                                                                                                                                  | `tests/integration/pending-operation-repository.test.ts` |
+| Units: input schemas, confirmation service, hashing, dates, errors, marketing, env, logger, database config                                                                                                                                     | `tests/unit/`                                            |
 
 The tests drive the server through the **official MCP SDK client** over real HTTP, against a real MySQL test database. Token expiry uses an injected fake clock, so no test sleeps.
 
@@ -395,19 +399,19 @@ Coverage is 100% of statements, lines and functions (98% of branches). `src/serv
 
 ## 12. Troubleshooting
 
-| Symptom | Cause and fix |
-|---|---|
-| `ECONNREFUSED 127.0.0.1:3306` | MySQL is not running, or `DB_HOST`/`DB_PORT` are wrong. |
-| `Access denied for user` | Wrong `DB_USER`/`DB_PASSWORD`, or the user lacks privileges on the database (section 4.1). If the password contains `#`, make sure it is wrapped in single quotes in `.env` (section 4.2). |
-| `Invalid environment configuration: …` | A variable in `.env` is invalid; the message names it. |
-| `403 Invalid Host` from `/mcp` | The request's `Host` header is not allowed. Set `MCP_ALLOWED_HOSTS` to the host name clients use (needed behind a tunnel or proxy), then restart. |
-| Custom connector cannot connect | Claude connects from Anthropic's cloud; `localhost` is unreachable to it. Use a public HTTPS URL (Option C). |
-| Connector check says `404` | The address has no path. Use the full address including `/mcp` (or your `MCP_PATH`). |
-| `404` on `/mcp` | You changed `MCP_PATH`; use the new path in the client. |
-| Changes to `.env` seem ignored | The server reads `.env` only at startup. Restart it. |
-| `Refusing to run tests against …` | `TEST_DB_NAME` must end in `_test`. |
-| `EADDRINUSE` | The port is taken; change `MCP_PORT`. |
-| Migrations say nothing to do | They already ran; use `npm run db:reset` to start over. |
+| Symptom                                | Cause and fix                                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ECONNREFUSED 127.0.0.1:3306`          | MySQL is not running, or `DB_HOST`/`DB_PORT` are wrong.                                                                                                                                    |
+| `Access denied for user`               | Wrong `DB_USER`/`DB_PASSWORD`, or the user lacks privileges on the database (section 4.1). If the password contains `#`, make sure it is wrapped in single quotes in `.env` (section 4.2). |
+| `Invalid environment configuration: …` | A variable in `.env` is invalid; the message names it.                                                                                                                                     |
+| `403 Invalid Host` from `/mcp`         | The request's `Host` header is not allowed. Set `MCP_ALLOWED_HOSTS` to the host name clients use (needed behind a tunnel or proxy), then restart.                                          |
+| Custom connector cannot connect        | Claude connects from Anthropic's cloud; `localhost` is unreachable to it. Use a public HTTPS URL (Option C).                                                                               |
+| Connector check says `404`             | The address has no path. Use the full address including `/mcp` (or your `MCP_PATH`).                                                                                                       |
+| `404` on `/mcp`                        | You changed `MCP_PATH`; use the new path in the client.                                                                                                                                    |
+| Changes to `.env` seem ignored         | The server reads `.env` only at startup. Restart it.                                                                                                                                       |
+| `Refusing to run tests against …`      | `TEST_DB_NAME` must end in `_test`.                                                                                                                                                        |
+| `EADDRINUSE`                           | The port is taken; change `MCP_PORT`.                                                                                                                                                      |
+| Migrations say nothing to do           | They already ran; use `npm run db:reset` to start over.                                                                                                                                    |
 
 More Claude-specific problems (no tools showing, billing messages, two connectors, and so on) are in [docs/CONNECTING_CLAUDE.md](docs/CONNECTING_CLAUDE.md#9-troubleshooting).
 

@@ -1,9 +1,10 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import { Transaction } from 'sequelize';
-import { ConfirmationError } from '../../utils/errors';
-import { canonicalHash, sha256Hex } from '../../utils/hash';
-import { PendingOperationRepository } from './confirmation.repository';
-import { OperationType } from './confirmation.types';
+import { randomBytes, randomUUID } from "node:crypto";
+import { Transaction } from "sequelize";
+import { ERROR_MESSAGES } from "../../config/messages";
+import { ConfirmationError } from "../../utils/errors";
+import { canonicalHash, sha256Hex } from "../../utils/hash";
+import { PendingOperationRepository } from "./confirmation.repository";
+import { OperationType } from "./confirmation.types";
 
 export type Clock = () => Date;
 
@@ -34,7 +35,7 @@ export class ConfirmationService {
   ) {}
 
   async issue(request: IssueRequest): Promise<IssuedConfirmation> {
-    const token = randomBytes(32).toString('base64url');
+    const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(this.clock().getTime() + this.ttlSeconds * 1000);
 
     await this.repository.create({
@@ -55,33 +56,51 @@ export class ConfirmationService {
    * another connection would let concurrent confirmations exhaust the pool and deadlock.
    * Returns the snapshot stored at proposal time.
    */
-  async consume(request: ConsumeRequest, transaction: Transaction): Promise<object> {
+  async consume(
+    request: ConsumeRequest,
+    transaction: Transaction,
+  ): Promise<object> {
     const now = this.clock();
-    const pending = await this.repository.findByTokenHash(sha256Hex(request.token), transaction);
+    const pending = await this.repository.findByTokenHash(
+      sha256Hex(request.token),
+      transaction,
+    );
 
     if (!pending) {
-      throw new ConfirmationError('INVALID', 'Confirmation token is not recognised');
+      throw new ConfirmationError(
+        "INVALID",
+        ERROR_MESSAGES.confirmation.invalid,
+      );
     }
     if (pending.consumed_at) {
-      throw new ConfirmationError('ALREADY_USED', 'Confirmation token has already been used');
+      throw new ConfirmationError(
+        "ALREADY_USED",
+        ERROR_MESSAGES.confirmation.alreadyUsed,
+      );
     }
     if (pending.expires_at <= now) {
-      throw new ConfirmationError('EXPIRED', 'Confirmation token has expired; request a new confirmation');
+      throw new ConfirmationError(
+        "EXPIRED",
+        ERROR_MESSAGES.confirmation.expired,
+      );
     }
     if (
       pending.operation_type !== request.operation ||
       pending.payload_hash !== canonicalHash(request.boundParams)
     ) {
       throw new ConfirmationError(
-        'PARAMETERS_MISMATCH',
-        'The parameters differ from those that were proposed for this confirmation token',
+        "PARAMETERS_MISMATCH",
+        ERROR_MESSAGES.confirmation.parametersMismatch,
       );
     }
 
     const claimed = await this.repository.claim(pending.id, now, transaction);
     if (!claimed) {
       // Lost a race with a concurrent confirmation (or the token expired in between).
-      throw new ConfirmationError('ALREADY_USED', 'Confirmation token has already been used');
+      throw new ConfirmationError(
+        "ALREADY_USED",
+        ERROR_MESSAGES.confirmation.alreadyUsed,
+      );
     }
     return pending.payload;
   }
