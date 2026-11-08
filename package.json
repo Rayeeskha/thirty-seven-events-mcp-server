@@ -1,0 +1,42 @@
+{
+  "name": "thirty-seven-events",
+  "version": "1.0.0",
+  "description": "MCP server for Thirty Seven Events: lets Claude search, read, add and update events, and draft marketing copy",
+  "private": true,
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --import tsx node_modules/sequelize-cli/lib/sequelize db:migrate",
+    "db:migrate:undo": "node --import tsx node_modules/sequelize-cli/lib/sequelize db:migrate:undo:all",
+    "db:seed": "node --import tsx node_modules/sequelize-cli/lib/sequelize db:seed:all",
+    "db:seed:undo": "node --import tsx node_modules/sequelize-cli/lib/sequelize db:seed:undo:all",
+    "db:reset": "npm run db:migrate:undo && npm run db:migrate && npm run db:seed",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6",
+    "sequelize": "^6.37.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.16.22",
+    "@swc/jest": "^0.2.39",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "jest": "^30.5.2",
+    "sequelize-cli": "^6.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
