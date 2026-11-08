@@ -389,7 +389,7 @@ Configuration is validated at startup: an invalid value stops the process with a
 Sequelize stays on 6.x because 7.x is still published only as an alpha. Runtime dependencies: the MCP SDK, Express, Sequelize, `mysql2`, Zod and `dotenv`.
 
 ```text
-thirty-seven-events/
+thirty-seven-events-mcp-server/
 ├── src/
 │   ├── config/              env.ts (validated env), database.ts, messages.ts, mcp-tools.config.ts, sequelize-cli.config.ts
 │   ├── database/
