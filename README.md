@@ -8,7 +8,7 @@ An **MCP (Model Context Protocol) server** for **Thirty Seven (37 Events)**, an 
 
 There is no REST API and no web interface: the MCP endpoint is the only thing the server exposes.
 
-![Architecture: Claude, the MCP server, the services and MySQL](docs/architecture.png)
+![Architecture: Claude, the MCP server, the services and MySQL](docs/architech.png)
 
 > **Connecting Claude?** The step-by-step guide (Claude Desktop, Claude Code, cloud tunnel), the demo prompts and troubleshooting are in **[docs/CONNECTING_CLAUDE.md](docs/CONNECTING_CLAUDE.md)**.
 

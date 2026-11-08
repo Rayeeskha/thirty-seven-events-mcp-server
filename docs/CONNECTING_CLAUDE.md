@@ -2,7 +2,7 @@
 
 A step-by-step guide to connecting the Thirty Seven Events MCP server to Claude, trying every tool, and checking the results.
 
-![Architecture: Claude, the MCP server, the services and MySQL](architecture.png)
+![Architecture: Claude, the MCP server, the services and MySQL](architech.png)
 
 ---
 
