@@ -176,26 +176,6 @@ mysql -u <user> -p thirty_seven_events -e "SELECT id,event_name,status FROM even
 - After prompt 9: it is there, exactly once.
 - After prompt 11: its `status` is `IN_PROGRESS`.
 
-**A different MCP client.** The official MCP Inspector talks to the same server without Claude:
-
-```bash
-npx @modelcontextprotocol/inspector --cli http://127.0.0.1:3001/mcp --transport http --method tools/list
-
-npx @modelcontextprotocol/inspector --cli http://127.0.0.1:3001/mcp --transport http \
-  --method tools/call --tool-name search_events --tool-arg client=Kingdom
-```
-
-**A check that does not depend on the AI.** Try to create an event with a made-up confirmation token:
-
-```bash
-npx @modelcontextprotocol/inspector --cli http://127.0.0.1:3001/mcp --transport http \
-  --method tools/call --tool-name add_event \
-  --tool-arg event_name="Hack Expo" --tool-arg event_date=2027-06-01 \
-  --tool-arg client=Test --tool-arg budget=1 --tool-arg confirmation_token=made-up
-```
-
-The result is an error with code `CONFIRMATION_TOKEN_INVALID`, and nothing is created. Confirmation is enforced by the server whatever the AI does.
-
 **The demo script** walks through all five tools and the confirmation rule, with you answering yes or no:
 
 ```bash
