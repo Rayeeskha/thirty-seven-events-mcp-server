@@ -17,7 +17,19 @@ The server exposes one endpoint, `/mcp` (Streamable HTTP). It has no REST API or
 
 ## Architecture Overview
 
-![Architecture diagram](docs/architecture.png)
+This diagram illustrates how users interact with Claude,
+how Claude communicates with the MCP server, and how
+the server accesses event data.
+
+![System Architecture](docs/architecture.png)
+
+## Internal Component Design
+
+This diagram illustrates the internal server components,
+including configuration validation, MCP tools, business
+services, repository patterns, and database connectivity.
+
+![Component Architecture](docs/key-feature-architecture.png)
 
 An MCP client sends a JSON-RPC request to `/mcp`. A tool module validates the arguments and calls a service. The service applies the business rules and uses repositories to read or write MySQL. The result, or a domain error, is returned as an MCP tool result.
 
