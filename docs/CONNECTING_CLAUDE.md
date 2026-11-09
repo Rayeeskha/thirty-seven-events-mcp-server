@@ -2,7 +2,7 @@
 
 A step-by-step guide to connecting the Thirty Seven Events MCP server to Claude, trying every tool, and checking the results.
 
-![Architecture: Claude, the MCP server, the services and MySQL](architech.png)
+![Architecture: Claude, the MCP server, the services and MySQL](claud-architech.png)
 
 ---
 
@@ -203,30 +203,3 @@ npm run demo
 ```
 
 (It creates one event for "Demo Client Ltd"; `npm run db:reset` removes it.)
-
-## 9. Troubleshooting
-
-| What you see                                                                             | Cause and fix                                                                                                                         |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Dialog: _"Claude connects from Anthropic's servers, so it can't reach a local address…"_ | You entered `localhost`. Use Route A or B, or Route C with a public HTTPS address.                                                    |
-| Connector check shows **404 Not found**                                                  | The address has no path. Use the full address, for example `…/mcp` or your secret `MCP_PATH`.                                         |
-| Connector check or `curl` shows **403** / `Invalid Host: <name>`                         | The server does not allow that hostname. Set `MCP_ALLOWED_HOSTS=<name>` in `.env` (hostname only), then **restart the server**.       |
-| Still `Invalid Host` after editing `.env`                                                | The server was not restarted, or a command was pasted into `.env`. Each setting must be a separate `NAME=value` line.                 |
-| Chat says **"Credit balance is too low"**                                                | A billing problem on that Claude account, not the server. Add credits or use another account.                                         |
-| Status change fails with `expected object, received string`                              | An older build read its stored proposal wrongly on some databases. Use the latest code (it is fixed and tested).                      |
-| No tools appear in the chat                                                              | Connector not switched on for that chat (**+** menu), server not running, config JSON invalid, or Claude Desktop not fully restarted. |
-| Claude Desktop cannot start the local connector                                          | `npx` not on the app's `PATH`. Use the full path from `which npx`.                                                                    |
-| Claude says it used two connectors and one failed                                        | You have the local and the cloud connector for the same server. Remove one.                                                           |
-| `ECONNREFUSED 127.0.0.1:3306`                                                            | MySQL is not running.                                                                                                                 |
-| `Access denied for user`                                                                 | Wrong DB credentials in `.env`. If the password contains `#`, wrap it in single quotes.                                               |
-| Confirmation says expired                                                                | Tokens last 5 minutes. Ask again.                                                                                                     |
-| Tunnel stopped working                                                                   | A quick-tunnel address changes at every restart. Repeat Route C from step 2 with the new hostname.                                    |
-| Claude saves something without asking you                                                | Report it. The server itself refuses any write without a valid, matching token, but keep Claude's tool-approval prompts on.           |
-
-## 10. Security checklist
-
-- The server has **no login**. Anyone with a reachable address can read events and add or change them by completing the two-step confirmation.
-- A secret `MCP_PATH` only makes the address hard to guess. It is not authentication.
-- Use Route A or B for everyday work. Use Route C briefly, then shut the tunnel down.
-- Add real authentication before exposing the server for real use.
-- Keep Claude's tool-approval prompts enabled.
